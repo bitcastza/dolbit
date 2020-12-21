@@ -1,9 +1,13 @@
 import datetime
+import requests
 
 def get_date(timestamp):
-    time = datetime.datetime.fromtimestamp(timestamp,
-                                           tz=datetime.timezone.utc)
+    time = datetime.datetime.utcfromtimestamp(timestamp)
     return time.date()
+
+def get_timestamp(date):
+    date = datetime.datetime(year=date.year, month=date.month, day=date.day)
+    return (date - datetime.datetime.utcfromtimestamp(0)).total_seconds()
 
 
 class ContractLine:
@@ -20,6 +24,26 @@ class ContractLine:
         self.start = get_date(int(data['date_start']))
         self.end = get_date(int(data['date_end']))
         self.quantity = int(data['qty'])
+        self.unit_price = float(data['subprice'])
+
+    def create(self, dol, contract):
+        if self.pk != -1:
+            return self
+        obj = {
+            'fk_product': self.product,
+            'statut': self.status,
+            'description': self.description,
+            'date_start': get_timestamp(self.start),
+            'date_end': get_timestamp(self.end),
+            'qty': self.quantity,
+            'subprice': self.unit_price,
+        }
+        self.pk = dol.post(f'/contracts/{contract}/lines', obj)
+        obj = {
+            'datestart': get_timestamp(self.start),
+        }
+        result = dol.put(f'/contracts/{contract}/lines/{self.pk}/activate', data=obj)
+        return self
 
     def __str__(self):
         result = f'{self.quantity}x {self.ref} - {self.label}'
@@ -38,7 +62,10 @@ class Contract:
         self.pk = data['id']
         self.ref = data['ref']
         self.status = data['statut']
+        self.third_party_id = data['socid']
         self.date = get_date(int(data['date_contrat']))
+        self.commercial_signature_id = data['commercial_signature_id']
+        self.commercial_suivi_id = data['commercial_suivi_id']
         self.lines = [ContractLine(x) for x in data['lines']]
         self._is_closed = None
         self._is_expired = None
@@ -68,6 +95,27 @@ class Contract:
                 self._is_expired = True
                 break
         return self._is_expired
+
+    def create(self, dol):
+        if self.pk != -1:
+            return self
+        obj = {
+            'socid': self.third_party_id,
+            'date_contrat': get_timestamp(self.date),
+            'commercial_signature_id': self.commercial_signature_id,
+            'commercial_suivi_id': self.commercial_suivi_id,
+        }
+        self.pk = dol.post('/contracts', obj)
+        dol.post(f'/contracts/{self.pk}/validate', {'notrigger': 0})
+        for line in self.lines:
+            line.create(dol, self.pk)
+        result = dol.get(f'/contracts/{self.pk}')
+        self = Contract(result)
+        return self
+
+    def end(self, dol):
+        result = dol.post(f'/contracts/{self.pk}/close', {'notrigger': '0'})
+        return result
 
     def __str__(self):
         result = f'{self.pk}: {self.ref} ({self.date}):'

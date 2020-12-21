@@ -1,10 +1,14 @@
 import argparse
+import datetime
+import copy
 import os
 import sys
-import dolibarr
 import pprint
+from requests.exceptions import HTTPError
 
 from .models import Contract, ContractLine
+from .utils import get_contracts
+from .dolibarr import Dolibarr
 
 CONTRACT_RENEW = 'renew'
 CONTRACT_LIST = 'list'
@@ -24,16 +28,36 @@ def get_option_or_exit(option, env_variable, error_msg, parser):
     return option
 
 def renew_contracts(url, api_key):
-    print('renew')
+    dol = Dolibarr(url=url, token=api_key)
+    expired_contracts = get_contracts(dol, expired=True)
+    new_contracts = []
+    for contract in expired_contracts:
+        new_contract = copy.deepcopy(contract)
+        new_contract.pk = -1
+        for line in new_contract.lines:
+            line.pk = -1
+            duration = line.end - line.start
+            start = line.end + datetime.timedelta(days=1)
+            line.start = start
+            line.end = start + duration + datetime.timedelta(days=1)
+        new_contract.date = datetime.datetime.utcnow().date()
+        new_contracts.append(new_contract)
+
+    for contract in new_contracts:
+        try:
+            contract.create(dol)
+        except HTTPError as e:
+            print(e.response.json())
+    for contract in expired_contracts:
+        try:
+            contract.end(dol)
+        except HTTPError as e:
+            print(e.response.json())
+    pprint.pprint(new_contracts)
 
 def list_contracts(url, api_key):
-    dol = dolibarr.Dolibarr(url=url, token=api_key)
-    result = dol.call_list_api('/contracts')
-    expired_contracts = []
-    for contract_data in result:
-        contract = Contract(contract_data)
-        if contract.is_expired():
-            expired_contracts.append(contract)
+    dol = Dolibarr(url=url, token=api_key)
+    expired_contracts = get_contracts(dol, expired=True)
     pprint.pprint(expired_contracts)
 
 if __name__ == '__main__':
