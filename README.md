@@ -11,5 +11,5 @@ useful upstream.
 ```
 virtualenv -p python3 pyenv
 pyenv/bin/pip install -r requirements
-python3 -m dolbit --help
+pyenv/bin/python3 -m dolbit --help
 ```
