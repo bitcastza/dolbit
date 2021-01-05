@@ -45,10 +45,12 @@ def renew_contracts(url, api_key):
 
     for contract in new_contracts:
         try:
+            print(f'Creating {contract}')
             contract.create(dol)
         except HTTPError as e:
             print(e.response.json())
     for contract in expired_contracts:
+        print(f'Ending old contract {contract}')
         try:
             contract.end(dol)
         except HTTPError as e:

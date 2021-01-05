@@ -2,8 +2,12 @@ import datetime
 import requests
 
 def get_date(timestamp):
-    time = datetime.datetime.utcfromtimestamp(timestamp)
-    return time.date()
+    try:
+        timestamp = int(timestamp)
+        time = datetime.datetime.utcfromtimestamp(timestamp)
+        return time.date()
+    except ValueError:
+        return None
 
 def get_timestamp(date):
     date = datetime.datetime(year=date.year, month=date.month, day=date.day)
@@ -21,8 +25,8 @@ class ContractLine:
         self.status = data['statut']
         self.label = data['product_label']
         self.description = data['description']
-        self.start = get_date(int(data['date_start']))
-        self.end = get_date(int(data['date_end']))
+        self.start = get_date(data['date_start'])
+        self.end = get_date(data['date_end'])
         self.quantity = int(data['qty'])
         self.unit_price = float(data['subprice'])
 
@@ -91,9 +95,10 @@ class Contract:
         self._is_expired = False
         for line in self.lines:
             now = datetime.datetime.utcnow().date()
-            if line.status == ContractLine.STATUS_RUNNING and line.end < now:
-                self._is_expired = True
-                break
+            if line.status == ContractLine.STATUS_RUNNING:
+                if line.end and line.end < now:
+                    self._is_expired = True
+                    break
         return self._is_expired
 
     def create(self, dol):
