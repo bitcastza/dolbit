@@ -11,7 +11,7 @@ def get_date(timestamp):
 
 def get_timestamp(date):
     date = datetime.datetime(year=date.year, month=date.month, day=date.day)
-    return (date - datetime.datetime.utcfromtimestamp(0)).total_seconds()
+    return int((date - datetime.datetime.utcfromtimestamp(0)).total_seconds())
 
 
 class ContractLine:
@@ -45,6 +45,7 @@ class ContractLine:
         self.pk = dol.post(f'/contracts/{contract}/lines', obj)
         obj = {
             'datestart': get_timestamp(self.start),
+            'dateend': get_timestamp(self.end),
         }
         result = dol.put(f'/contracts/{contract}/lines/{self.pk}/activate', data=obj)
         return self
@@ -96,7 +97,7 @@ class Contract:
         for line in self.lines:
             now = datetime.datetime.utcnow().date()
             if line.status == ContractLine.STATUS_RUNNING:
-                if line.end and line.end < now:
+                if line.end and (line.end < now or line.end == now):
                     self._is_expired = True
                     break
         return self._is_expired

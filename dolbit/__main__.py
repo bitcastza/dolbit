@@ -37,9 +37,9 @@ def renew_contracts(url, api_key):
         for line in new_contract.lines:
             line.pk = -1
             duration = line.end - line.start
-            start = line.end + datetime.timedelta(days=1)
+            start = line.end
             line.start = start
-            line.end = start + duration + datetime.timedelta(days=1)
+            line.end = start + duration
         new_contract.date = datetime.datetime.utcnow().date()
         new_contracts.append(new_contract)
 
